@@ -12,11 +12,13 @@ docker-compose.yml
 Add the following line to the yml file. Don't forget to replace "YOUR_USERNAME" and "YOUR_PASSWORD" with your **real user credentials**, "localhost" and "5672" with your **real RabbitMQ host and port**:
 
 ```yml
-version: '3.0'
 services:
   mytb:
     restart: always
-    image: "thingsboard/tb-postgres"
+    image: "thingsboard/tb-node:{{ site.release.ce_ver }}"
+    depends_on:
+      my-postgres:
+        condition: service_healthy
     ports:
       - "8080:9090"
       - "1883:1883"
@@ -28,13 +30,35 @@ services:
       TB_QUEUE_RABBIT_MQ_PASSWORD: YOUR_PASSWORD
       TB_QUEUE_RABBIT_MQ_HOST: localhost
       TB_QUEUE_RABBIT_MQ_PORT: 5672
+      SPRING_DATASOURCE_URL: jdbc:postgresql://my-postgres:5432/thingsboard
+      DATABASE_TS_TYPE: sql
+      SPRING_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     volumes:
-      - mytb-data:/data
-      - mytb-logs:/var/log/thingsboard
+      - mytb-node-logs:/var/log/thingsboard
+      - mytb-node-conf:/config
+  my-postgres:
+    restart: always
+    image: "postgres:16"
+    ports:
+    - "5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - mytb-data/db:/var/lib/postgresql/data
 volumes:
   mytb-data:
     external: true
-  mytb-logs:
+  mytb-node-logs:
+    external: true
+  mytb-node-conf:
     external: true
 ```
 {: .copy-code}
