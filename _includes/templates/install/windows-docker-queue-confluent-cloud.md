@@ -10,17 +10,24 @@ docker-compose.yml
 Add the following line to the yml file. Don’t forget to replace “CLUSTER_API_KEY”, "CLUSTER_API_SECRET" and "localhost:9092" with your real Confluent Cloud bootstrap servers:
 
 ```yml
-version: '3.0'
 services:
-  mytb:
+  mytb-node:
     restart: always
-    image: "thingsboard/tb-postgres"
+    image: "thingsboard/tb-node:{{ site.release.ce_ver }}"
+    depends_on:
+      my-postgres:
+        condition: service_healthy
     ports:
       - "8080:9090"
       - "1883:1883"
       - "7070:7070"
       - "5683-5688:5683-5688/udp"
     environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://my-postgres:5432/thingsboard
+      DATABASE_TS_TYPE: sql
+      SPRING_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
       TB_QUEUE_TYPE: kafka
       TB_KAFKA_SERVERS: localhost:9092
       TB_QUEUE_KAFKA_REPLICATION_FACTOR: 3
@@ -52,12 +59,29 @@ services:
       TB_QUEUE_VC_INTERVAL_MS: 1000
       TB_QUEUE_VC_PARTITIONS: 1
     volumes:
-      - mytb-data:/data
-      - mytb-logs:/var/log/thingsboard
+      - mytb-node-logs:/var/log/thingsboard
+      - mytb-node-conf:/config
+  my-postgres:
+    restart: always
+    image: "postgres:16"
+    ports:
+      - "5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - mytb-data/db:/var/lib/postgresql/data
 volumes:
   mytb-data:
     external: true
-  mytb-logs:
+  mytb-node-logs:
+    external: true
+  mytb-node-conf:
     external: true
 ```
 {: .copy-code}\

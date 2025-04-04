@@ -12,8 +12,10 @@ description: Installing ThingsBoard IoT Platform using Docker (Linux or Mac OS)
 * TOC
 {:toc}
 
-This guide will help you to install and start ThingsBoard using Docker on Linux or Mac OS.
+This guide will help you to install and start ThingsBoard Community Edition (CE) using Docker Compose on Linux or Mac OS.
+If you are looking for a cluster installation instruction, please visit [cluster setup page](/docs/user-guide/install/cluster-setup/).  
 
+If you are using the `thingsboard/tb-postgres` image, please check the following [guide](/docs/user-guide/install/migrate-to-tb-node) to migrate to the new image.
 
 ## Prerequisites
 
@@ -21,13 +23,7 @@ This guide will help you to install and start ThingsBoard using Docker on Linux 
 
 {% include templates/install/docker-install-note.md %}
 
-## Running
-
-In this instruction [thingsboard/tb-postgres](https://hub.docker.com/r/thingsboard/tb-postgres/) image will be used. It contains a single instance of ThingsBoard with PostgreSQL database.
-
-Running this image requires a server with at least 4GB of RAM (8GB is recommended) and minimum load (few messages per second).
-
-## Choose ThingsBoard queue service
+## Step 1. Choose ThingsBoard queue service
 
 {% include templates/install/install-queue.md %}
 
@@ -44,62 +40,117 @@ Confluent Cloud <small>(Event Streaming Platform based on Kafka)</small>%,%confl
 
 Where: 
 
-- `8080:9090`            - connect local port 8080 to exposed internal HTTP port 9090
-- `1883:1883`            - connect local port 1883 to exposed internal MQTT port 1883
-- `7070:7070`            - connect local port 7070 to exposed internal Edge RPC port 7070
-- `5683-5688:5683-5688/udp`            - connect local UDP ports 5683-5688 to exposed internal COAP and LwM2M ports 
-- `~/.mytb-data:/data`   - mounts the host's dir `~/.mytb-data` to ThingsBoard DataBase data directory
-- `~/.mytb-logs:/var/log/thingsboard`   - mounts the host's dir `~/.mytb-logs` to ThingsBoard logs directory
-- `mytb`             - friendly local name of this machine
-- `restart: always`        - automatically start ThingsBoard in case of system reboot and restart in case of failure.
-- `image: thingsboard/tb-postgres`          - docker image, can be also `thingsboard/tb-cassandra` or `thingsboard/tb`
+- `8080:8080` - connects local port 8080 to the exposed internal HTTP port 8080.
+- `1883:1883` - connects local port 1883 to the exposed internal MQTT port 1883.
+- `7070:7070` - connects local port 7070 to the exposed internal Edge RPC port 7070.
+- `5683-5688:5683-5688/udp` - connects local UDP ports 5683-5688 to the exposed internal COAP and LwM2M ports.
+- `~/.mytb-node-logs:/var/log/thingsboard` - mounts the host's directory `~/.mytb-node-logs` to the ThingsBoard logs directory.
+- `~/.mytb-node-conf:/config` - mounts the host's directory `~/.mytb-node-conf` to the ThingsBoard configuration directory.
+- `~/.mytb-data/db:/var/lib/postgresql/data` - mounts the host's directory `~/.mytb-data/db` to the PostgreSQL data directory.
+- `mytb-node` - friendly local name of this machine.
+- `restart: always` - automatically start ThingsBoard in case of system reboot and restarts in case of failure.
+- `thingsboard/tb-node` - Docker image.
+- `my-postgres` - friendly local name for PostgreSQL.
+- `5432` - exposed port for connecting to the PostgreSQL database.
+- `healthcheck` - health check for the PostgreSQL service using the `pg_isready` command.
+- `POSTGRES_DB: thingsboard` - database name for ThingsBoard.
+- `POSTGRES_PASSWORD: postgres` - password for the PostgreSQL user.
+
+
+## Step 2. Setup configs and folders
 
 {% include templates/install/docker/docker-create-folders-sudo-explained.md %}
 
 ```
 mkdir -p ~/.mytb-data && sudo chown -R 799:799 ~/.mytb-data
-mkdir -p ~/.mytb-logs && sudo chown -R 799:799 ~/.mytb-logs
+mkdir -p ~/.mytb-node-logs && sudo chown -R 799:799 ~/.mytb-node-logs
 ```
 {: .copy-code}
 
-**NOTE**: Replace directory `~/.mytb-data` and `~/.mytb-logs` with directories you're planning to use in `docker-compose.yml`.
+The `thingsboard/tb-node` image requires the configuration files. Download the files to the corresponding directory and apply required permissions with the following commands:
+```bash
+mkdir -p ~/.mytb-node-conf
+curl -L -o ~/.mytb-node-conf/thingsboard.conf https://raw.githubusercontent.com/thingsboard/thingsboard/refs/heads/master/docker/tb-node/conf/thingsboard.conf
+curl -L -o ~/.mytb-node-conf/logback.xml https://raw.githubusercontent.com/thingsboard/thingsboard/refs/heads/master/docker/tb-node/conf/logback.xml
+sudo chown -R 799:799 ~/.mytb-node-conf
+```
+{: .copy-code}
 
-{% assign serviceName = "tb" %}
+**NOTE**: Replace directories:
+- `~/.mytb-data/db`
+- `~/.mytb-node-logs`
+- `~/.mytb-node-conf` 
+
+with directories you're planning to use in `docker-compose.yml`.
+
+## Step 3. Install ThingsBoard
+
+Run the following command to install ThingsBoard:
+
+```bash
+docker compose run --rm \
+  -e INSTALL_TB=true \
+  -v ~/.mytb-node-logs:/var/log/thingsboard \
+  -v ~/.mytb-node-conf:/config \
+  mytb-node \
+  sh -c "start-tb-node.sh"
+```
+{: .copy-code}
+
+## Step 4. Run ThingsBoard
+
+{% assign serviceName = "tb-node" %}
 {% include templates/install/docker/docker-compose-up-and-ui-credentials.md %}
-
 ## Detaching, stop and start commands
 
 {% assign serviceFullName = "ThingsBoard" %}
-{% include templates/install/docker/detaching-stop-start-commands.md %}
 
-## Upgrading
+You can detach from session terminal using `Ctrl-p` `Ctrl-q` key sequence - the container will keep running in the background.
 
-In order to update to the latest image, execute the following commands:
+In case of any issues you can examine service logs for errors.
+For example to see {{serviceFullName}} container logs execute the following command:
 
 ```
-docker pull thingsboard/tb-postgres
-docker compose stop
-docker run -it -v ~/.mytb-data:/data --rm thingsboard/tb-postgres upgrade-tb.sh
-docker compose rm mytb
-docker compose up
+docker compose logs -f my{{serviceName}}
 ```
 {: .copy-code}
 
-**NOTE**: if you use different database change image name in all commands from `thingsboard/tb-postgres` to `thingsboard/tb-cassandra` or `thingsboard/tb` correspondingly.
- 
-**NOTE**: replace host's directory `~/.mytb-data` with directory used during container creation. 
+To stop the container:
 
-**NOTE**: if you have used one database and want to try another one, then remove the current docker container using `docker-compose rm` command and use different directory for `~/.mytb-data` in `docker-compose.yml`.
+```
+docker compose stop my{{serviceName}}
+```
+{: .copy-code}
 
-{% capture dockerComposeStandalone %}
-If you still rely on Docker Compose as docker-compose (with a hyphen) here is the list of the above commands:
-<br>**docker pull thingsboard/tb-postgres**
-<br>**docker-compose stop**
-<br>**docker run -it -v ~/.mytb-data:/data --rm thingsboard/tb-postgres upgrade-tb.sh**
-<br>**docker-compose rm mytb**
-<br>**docker-compose up**
-{% endcapture %}
-{% include templates/info-banner.md content=dockerComposeStandalone %}
+To start the container:
+
+```
+docker compose start my{{serviceName}}
+```
+{: .copy-code}
+
+## Upgrading
+
+In order to update to the latest image сhange your current version to the latest one, for example:
+
+```text
+image: "thingsboard/tb-node:3.9.0"  --> image: "thingsboard/tb-node:latest"
+```
+
+Run the following commands:
+
+```bash
+docker pull thingsboard/tb-node:latest
+docker compose run --rm \
+  -e UPGRADE_TB=true  \
+  -e FROM_VERSION=3.9.0 \
+  -v ~/.mytb-node-logs:/var/log/thingsboard \
+  -v ~/.mytb-node-conf:/config \
+  mytb-node \
+  sh -c "start-tb-node.sh"
+docker compose up
+```
+{: .copy-code}
 
 ## Troubleshooting
 

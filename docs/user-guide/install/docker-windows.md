@@ -11,30 +11,17 @@ description: Installing ThingsBoard IoT Platform using Docker (Windows)
 
 * TOC
 {:toc}
+This guide will help you to install and start ThingsBoard Community Edition (CE) using on Windows.
+If you are looking for a cluster installation instruction, please visit [cluster setup page](/docs/user-guide/install/cluster-setup/).  
 
-This guide will help you to install and start ThingsBoard using Docker on Windows.
-
+If you are using the `thingsboard/tb-postgres` image, please check the following [guide](/docs/user-guide/install/migrate-to-tb-node) to migrate to the new image.
 
 ## Prerequisites
 
 - [Install Docker Toolbox for Windows](https://docker-docs.uclv.cu/toolbox/toolbox_install_windows/)
 
-## Running
 
-In this instruction [thingsboard/tb-postgres](https://hub.docker.com/r/thingsboard/tb-postgres/) image will be used. It contains a single instance of ThingsBoard with PostgreSQL database.
-
-Running this image requires a server with at least 4GB of RAM (8GB is recommended) and minimum load (few messages per second).
-
-Windows users should use docker managed volume for ThingsBoard Database. 
-Create docker volume (for ex. `mytb-data`) before executing docker run command:
-Open "Docker Quickstart Terminal". Execute the following command to create docker volume:
-
-``` 
-docker volume create mytb-data
-docker volume create mytb-logs
-```
-
-## Choose ThingsBoard queue service
+## Step 1. Choose ThingsBoard queue service
 
 {% include templates/install/install-queue.md %}
 
@@ -51,15 +38,34 @@ Confluent Cloud <small>(Event Streaming Platform based on Kafka)</small>%,%confl
 
 Where: 
 
-- `8080:9090`            - connect local port 8080 to exposed internal HTTP port 9090
-- `1883:1883`            - connect local port 1883 to exposed internal MQTT port 1883
-- `7070:7070`            - connect local port 7070 to exposed internal Edge RPC port 7070
-- `5683-5688:5683-5688/udp`            - connect local UDP ports 5683-5688 to exposed internal COAP and LwM2M ports 
-- `~/.mytb-data:/data`   - mounts the host's dir `~/.mytb-data` to ThingsBoard DataBase data directory
-- `~/.mytb-logs:/var/log/thingsboard`   - mounts the host's dir `~/.mytb-logs` to ThingsBoard logs directory
-- `mytb`             - friendly local name of this machine
-- `restart: always`        - automatically start ThingsBoard in case of system reboot and restart in case of failure.
-- `image: thingsboard/tb-postgres`          - docker image, can be also `thingsboard/tb-cassandra` or `thingsboard/tb`
+- `8080:8080` - connects local port 8080 to the exposed internal HTTP port 8080.
+- `1883:1883` - connects local port 1883 to the exposed internal MQTT port 1883.
+- `7070:7070` - connects local port 7070 to the exposed internal Edge RPC port 7070.
+- `5683-5688:5683-5688/udp` - connects local UDP ports 5683-5688 to the exposed internal COAP and LwM2M ports.
+- `mytb-node-logs:/var/log/thingsboard` - maps the `mytb-node-logs` volume to the `/var/log/thingsboard` directory inside the container.
+- `mytb-node-conf:/config` - maps the `mytb-node-conf` volume to the `/config` directory inside the container.
+- `mytb-data/db:/var/lib/postgresql/data` - maps the `mytb-data` volume to the `/var/lib/postgresql/data` directory inside the container.
+- `mytb-node` - friendly local name of this machine.
+- `restart: always` - automatically start ThingsBoard in case of system reboot and restarts in case of failure.
+- `thingsboard/tb-node` - Docker image.
+- `my-postgres` - friendly local name for PostgreSQL.
+- `5432` - exposed port for connecting to the PostgreSQL database.
+- `healthcheck` - health check for the PostgreSQL service using the `pg_isready` command.
+- `POSTGRES_DB: thingsboard` - database name for ThingsBoard.
+- `POSTGRES_PASSWORD: postgres` - password for the PostgreSQL user.
+
+## Step 2. Setup config and folders
+
+Windows users should use docker managed volume for ThingsBoard Database. 
+Create docker volume (for ex. `mytb-data`) before executing docker run command:
+Open "Docker Quickstart Terminal". Execute the following command to create docker volumes:
+
+```text
+docker volume create mytb-data
+docker volume create mytb-node-logs
+docker volume create mytb-node-conf
+```
+{: .copy-code}
 
 {% assign serviceName = "tb" %}
 {% include templates/install/docker/docker-compose-up.md %}

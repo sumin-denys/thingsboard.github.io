@@ -10,11 +10,13 @@ docker-compose.yml
 Add the following line to the yml file. Don't forget to replace “YOUR_NAMESPACE_NAME” with your **real Service Bus namespace name**, and "YOUR_SAS_KEY_NAME", "YOUR_SAS_KEY" with your **real Service Bus credentials. Note: "YOUR_SAS_KEY_NAME" it is "SAS Policy", "YOUR_SAS_KEY" it is "SAS Policy Primary Key":**
 
 ```yml
-version: '3.0'
 services:
   mytb:
     restart: always
-    image: "thingsboard/tb-postgres"
+    image: "thingsboard/tb-node:{{ site.release.ce_ver }}"
+    depends_on:
+      my-postgres:
+        condition: service_healthy
     ports:
       - "8080:9090"
       - "1883:1883"
@@ -25,6 +27,12 @@ services:
       TB_QUEUE_SERVICE_BUS_NAMESPACE_NAME: YOUR_NAMESPACE_NAME
       TB_QUEUE_SERVICE_BUS_SAS_KEY_NAME: YOUR_SAS_KEY_NAME
       TB_QUEUE_SERVICE_BUS_SAS_KEY: YOUR_SAS_KEY
+      SPRING_DATASOURCE_URL: jdbc:postgresql://my-postgres:5432/thingsboard
+      DATABASE_TS_TYPE: sql
+      SPRING_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+
 
       # These params affect the number of requests per second from each partitions per each queue.
       # Number of requests to particular Message Queue is calculated based on the formula:
@@ -51,12 +59,29 @@ services:
       TB_QUEUE_VC_INTERVAL_MS: 1000
       TB_QUEUE_VC_PARTITIONS: 1
     volumes:
-      - mytb-data:/data
-      - mytb-logs:/var/log/thingsboard
+      - mytb-node-logs:/var/log/thingsboard
+        mytb-node-conf:/config
+  my-postgres:
+    restart: always
+    image: "postgres:16"
+    ports:
+      - "5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - mytb-data/db:/var/lib/postgresql/data
 volumes:
   mytb-data:
     external: true
-  mytb-logs:
+  mytb-node-logs:
+    external: true
+  mytb-node-conf:
     external: true
 ```
 {: .copy-code}
