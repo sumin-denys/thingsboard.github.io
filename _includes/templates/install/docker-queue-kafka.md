@@ -11,11 +11,10 @@ nano docker-compose.yml
 Add the following lines to the yml file.
 
 ```yml
-version: '3.2'
 services:
   kafka:
     restart: always
-    image: bitnami/kafka:3.8.1
+    image: "bitnami/kafka:3.8.1:"
     ports:
       - 9092:9092 #to localhost:9092 from host machine
       - 9093 #for Kraft
@@ -36,22 +35,43 @@ services:
       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka:9093" #KRaft
     volumes:
       - kafka-data:/bitnami
-  mytb:
+  mytb-node:
     restart: always
-    image: "thingsboard/tb-postgres"
+    image: "thingsboard/tb-node:{{ site.release.ce_ver }}"
     depends_on:
-      - kafka
+      my-postgres:
+        condition: service_healthy
     ports:
-      - "8080:9090"
+      - "8080:8080"
       - "1883:1883"
       - "7070:7070"
       - "5683-5688:5683-5688/udp"
     environment:
       TB_QUEUE_TYPE: kafka
       TB_KAFKA_SERVERS: kafka:9094
+      SPRING_DATASOURCE_URL: jdbc:postgresql://my-postgres:5432/thingsboard
+      DATABASE_TS_TYPE: sql
+      SPRING_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     volumes:
-      - ~/.mytb-data:/data
-      - ~/.mytb-logs:/var/log/thingsboard
+      - ~/.mytb-node-logs:/var/log/thingsboard
+      - ~/.mytb-node-conf:/config
+  my-postgres:
+    restart: always
+    image: "postgres:16"
+    ports:
+      - "5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - ~/.mytb-data/db:/var/lib/postgresql/data
 volumes:
   kafka-data:
     driver: local
